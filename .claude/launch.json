@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "how-many",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "5221"],
+      "port": 5221
+    }
+  ]
+}
