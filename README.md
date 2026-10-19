@@ -6,7 +6,7 @@ underneath, one answer box for each kind. The sheets have no words, so they work
 they're made for a black-and-white printer. The answer is hidden in a QR code: scan it with a phone camera to watch
 every picture get counted.
 
-Will be live at **https://tb-x.github.io/how-many/**
+Live at **https://tb-x.github.io/how-many/**
 
 ## How it plays
 
