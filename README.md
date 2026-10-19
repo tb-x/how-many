@@ -17,9 +17,12 @@ Live at **https://tb-x.github.io/how-many/**
   next to its picture, or colour that many dots, depending on how the sheet was made. The dots come in groups of
   five, so they're easy to count too.
 - Every kind has a different number, so no two answers are the same.
+- With **Tricky ones** turned on, a few lookalikes hide among them: a fly among the bees, a slug among the snails,
+  an umbrella among the mushrooms, a star among the starfish. They have no answer box, so they don't count. Only
+  count pictures exactly like the one in the answer box.
 - Scan the QR code in the top right corner of the box. The answer page counts one kind at a time: each picture
   lights up with its number (1, 2, 3…), and when a kind is done its total pops into its answer box (as a big
-  number, or as coloured dots). Tap the picture to count again.
+  number, or as coloured dots). Any tricky ones fade first and get a grey ✕. Tap the picture to count again.
 
 ## The maker page
 
@@ -32,6 +35,20 @@ Live at **https://tb-x.github.io/how-many/**
   octopus, turtle), Space (star, moon, rocket, planet, UFO, comet), Farm (pig, chick, sheep, carrot, tractor,
   apple), Sweets (lollipop, sweet, cupcake, ice cream, doughnut, cake), or A mix (each kind from a different
   set). Every picture is a black outline, so it can be coloured in.
+- **Tricky ones**: None, A few (one kind of lookalike, 2 or 3 of it) or Lots (two kinds, 2 to 4 of each). Each
+  lookalike is picked to match a kind in the box:
+
+  | Kind | Tricky one |
+  | --- | --- |
+  | Flower, bee, butterfly | Sun, fly, dragonfly |
+  | Ladybird, snail, mushroom | Spider or turtle, slug, umbrella or cupcake |
+  | Fish, starfish, crab, octopus, turtle | Leaf, star, spider, jellyfish, ladybird |
+  | Star, moon, rocket, planet, UFO, comet | Starfish, banana, carrot, ball, hat, balloon |
+  | Chick, sheep, carrot, apple | Lemon, cloud, rocket, pear |
+  | Lollipop, sweet, cupcake, ice cream, doughnut, cake | Balloon or flower, bow, mushroom, carrot, lifebuoy, drum |
+
+  Shell, pig and tractor have no lookalike, and when the kinds in a box have too few between them, the maker picks
+  other kinds.
 - **Per page**: 1 or 2 boxes on each A4 page. The pictures are made as big as the box allows (up to 2 cm); 2 per
   page is greyed out when a crowded box would need pictures smaller than 1 cm.
 - **Pages**: how many pages to print at once (up to 20).
@@ -40,7 +57,7 @@ Live at **https://tb-x.github.io/how-many/**
 - Clicking a QR code on screen opens its answer page.
 
 The QR code holds the whole scene in the link, all as digits: the box's size, the picture size, the answer style,
-"up to", then each kind's picture and count, then every picture's place on a 100 × 100 grid and how far it's turned
+"up to", then each kind's picture and count, then each tricky one's picture and count, then every picture's place on a 100 × 100 grid and how far it's turned
 (5 digits a picture). Each picture's slight size difference comes from those same digits, so the answer page can
 redraw the scene exactly. The digits go into the QR code in its numeric mode, which packs them tightly; a crowded
 box still needs a bigger QR code, so it grows to keep every dot at least 0.4 mm (about 25 mm for 5 kinds of up to
@@ -66,10 +83,12 @@ Named constants at the top of the script in `index.html`:
 
 | Constant | Default | What it does |
 | --- | --- | --- |
-| `DEFAULTS` | 3 kinds, up to 10, a number, Garden, 1 a page, 1 page | Starting settings |
+| `DEFAULTS` | 3 kinds, up to 10, a number, Garden, no tricky ones, 1 a page, 1 page | Starting settings |
 | `KINDS` | 2, 3, 4, 5 | The choices under "Kinds" |
 | `UP_TO` | 5, 10, 15, 20 | The choices under "Up to" |
 | `SHEETS_MAX` | 20 | Most pages printed at once |
+| `TRICKY`, `TRICKY_MIN` | none / 1 kind of up to 3 / 2 kinds of up to 4; at least 2 | How many tricky ones each choice gives |
+| `TRICKS` | see the table above | Which lookalikes can go with each kind |
 | `COUNT_LOW` | 0.3 | Counts are picked from "up to" × this, up to "up to" |
 | `PIC_MAX` / `PIC_MIN` | 20 / 10 mm | Biggest picture in a box, and the smallest that allows 2 boxes a page |
 | `DENSITY` | 0.46 | How much of the box the pictures (with their gaps) are sized to fill |

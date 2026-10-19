@@ -17,7 +17,7 @@
 <link rel="stylesheet" crossorigin="anonymous" href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js" crossorigin="anonymous"></script>
 <style>
-  /* Layout: maker mode is a settings card above a column of A4 sheet previews; each sheet prints in black and white as one wordless page of 1 or 2 counting scenes (a big framed box of scattered pictures with the answer QR code in a notch at its top right, and below it one answer box per kind of picture: the picture, then a box to write the number in or a row of dots to colour). Answer mode (the QR's #186… link) is one scene on a card, counted out loud in coloured badges. */
+  /* Layout: maker mode is a settings card above a column of A4 sheet previews; each sheet prints in black and white as one wordless page of 1 or 2 counting scenes (a big framed box of scattered pictures, optionally with a few lookalikes that are not counted with the answer QR code in a notch at its top right, and below it one answer box per kind of picture: the picture, then a box to write the number in or a row of dots to colour). Answer mode (the QR's #186… link) is one scene on a card, counted out loud in coloured badges. */
   :root{
     --ink:#1f2a44; --gold:#c0861f; --cream:#f7f1e3; --cream-dark:#e2d6b8;
     --go:#2fa34a; --red:#d4452f; --faint:#aab0bd;
@@ -78,7 +78,9 @@
   .hm .dot{fill:#fff;stroke:var(--ink)}
   .hm text{font-family:var(--read);font-weight:bold;text-anchor:middle;dominant-baseline:central}
   /* answer: each picture tints and gets its number in turn, then the kind's total shows below */
-  .counting .obj [fill="#fff"]{animation:tint .25s var(--d) forwards}
+  .counting .obj:not(.decoy) [fill="#fff"]{animation:tint .25s var(--d) forwards}
+  .counting .decoy{animation:fade .4s var(--d) forwards}
+  @keyframes fade{to{opacity:.3}}
   .counting .pop{transform-box:fill-box;transform-origin:50% 50%;animation:pop .35s cubic-bezier(.3,1.6,.6,1) var(--d) both}
   @keyframes tint{to{fill:var(--c)}}
   @keyframes pop{from{transform:scale(0);opacity:0}}
@@ -119,6 +121,9 @@
       <select id="answerBy"><option value="write">A number</option><option value="dots">Dots</option></select>
     </label>
     <label>Pictures <select id="theme"></select></label>
+    <label>Tricky ones
+      <select id="tricky"><option value="0">None</option><option value="1">A few</option><option value="2">Lots</option></select>
+    </label>
     <label>Per page
       <select id="perPage"><option value="1">1</option><option value="2">2</option></select>
     </label>
@@ -132,10 +137,12 @@
 
 <script>
 /* ======== tuning ======== */
-const DEFAULTS = { kinds: 3, upTo: 10, answerBy: 'write', theme: '0', perPage: 1, sheets: 1 };
+const DEFAULTS = { kinds: 3, upTo: 10, answerBy: 'write', theme: '0', tricky: 0, perPage: 1, sheets: 1 };
 const KINDS = [2, 3, 4, 5];          // kinds of picture in a scene, offered in the list
 const UP_TO = [5, 10, 15, 20];       // most of one kind, offered in the list
 const SHEETS_MAX = 20;
+const TRICKY = { 0: [0, 0], 1: [1, 3], 2: [2, 4] };   // "Tricky ones" (none, a few, lots) → kinds of lookalike, and most of each…
+const TRICKY_MIN = 2;                // …and fewest of each
 const COUNT_LOW = 0.3;               // each kind's count is picked from (up to × this)…(up to), every kind a different count
 const PIC_MAX = 20;                  // mm, biggest picture in the scene…
 const PIC_MIN = 10;                  // …and smallest: "2 per page" is greyed out when the scenes would need smaller ones
@@ -315,8 +322,51 @@ const CAKE = `<path d="M-40-2V30Q0 44 40 30V-2z" ${STROKE}/><ellipse cy="-2" rx=
   <path d="M-40 2Q-35 16-28 8-22 18-14 9-6 19 2 10 10 19 18 9 26 18 32 8 37 14 40 2" ${LINE(3.5)}/>
   <rect x="-5" y="-34" width="10" height="31" rx="2" ${STROKE}/><path d="M0-52Q9-43 0-37-9-43 0-52z" ${STROKE}/>`;
 
+// --- tricky ones: lookalikes that are never a kind to count, only scattered among the others
+const SUN = `<path d="${range(8).map((i) => { const [a, b] = polar(31, i * 45), [c, d] = polar(46, i * 45); return `M${a} ${b}L${c} ${d}`; }).join('')}" ${LINE(5)}/>
+  <circle r="24" ${STROKE}/>${DOT(-8, -5, 3.5)}${DOT(8, -5, 3.5)}<path d="M-10 7Q0 15 10 7" ${LINE(3.5)}/>`;
+const FLY = `<ellipse cx="-8" cy="-22" rx="12" ry="20" transform="rotate(-30 -8 -22)" ${STROKE}/>
+  <ellipse cx="8" cy="-22" rx="12" ry="20" transform="rotate(30 8 -22)" ${STROKE}/>
+  <path d="M-16 18-22 36M-2 22V40M12 18 18 36" ${LINE(4)}/>
+  <ellipse cx="-8" cy="8" rx="30" ry="17" fill="${INK}"/><circle cx="26" cy="4" r="14" ${STROKE}/><circle cx="30" cy="0" r="7" fill="${INK}"/>`;
+const DRAGONFLY = mirror(`<ellipse cx="-25" cy="-16" rx="24" ry="8" transform="rotate(-10 -25 -16)" ${STROKE}/>
+  <ellipse cx="-23" cy="2" rx="22" ry="7" transform="rotate(12 -23 2)" ${STROKE}/>`)
+  + `<rect x="-5" y="-22" width="10" height="70" rx="5" ${STROKE}/><circle cy="-31" r="11" ${STROKE}/>${DOT(-5, -33, 3.5)}${DOT(5, -33, 3.5)}`;
+const SPIDER = mirror(`<path d="M-18-8Q-36-32-46-14M-22 0Q-42-10-48 6M-22 8Q-42 14-46 30M-16 16Q-30 34-34 47" ${LINE(4.5)}/>`)
+  + `<circle cy="6" r="24" ${STROKE}/><circle cy="-22" r="12" ${STROKE}/>${DOT(-5, -24, 3.5)}${DOT(5, -24, 3.5)}`;
+const SLUG = `<path d="M-36-10-43-29M-30-10-27-29" ${LINE(4)}/>${DOT(-43, -30, 4.5)}${DOT(-27, -30, 4.5)}
+  <path d="M-46 34C-52 14-46-12-33-12-20-12-20 0-14 4-2-6 30 2 48 34z" ${STROKE}/>${DOT(-36, -2, 3.5)}
+  <path d="M-6 14Q12 6 30 20" ${LINE(3)}/>`;
+const UMBRELLA = `<path d="M0-4V36Q0 46-9 46-17 46-17 38" ${LINE(5)}/><path d="M0-38V-48" ${LINE(5)}/>
+  <path d="M-48 2C-46-40 46-40 48 2Q40-6 32 2 24-6 16 2 8-6 0 2-8-6-16 2-24-6-32 2-40-6-48 2z" ${STROKE}/>
+  <path d="M0-37Q-14-20-16 0M0-37Q14-20 16 0" ${LINE(3)}/>`;
+const LEAF = `<path d="M30 0 47 9" ${LINE(5)}/><path d="M-46 0C-28-30 16-30 32 0 16 30-28 30-46 0z" ${STROKE}/>
+  <path d="M-36 0H28M-20 0-8-13M-20 0-8 13M0 0 11-11M0 0 11 11" ${LINE(3)}/>`;
+const JELLYFISH = `<path d="M-22 4Q-28 18-20 28T-22 46M-8 6Q-14 20-6 30T-8 46M8 6Q2 20 10 30T8 46M22 4Q16 18 24 28T22 46" ${LINE(4)}/>
+  <path d="M-36 6C-38-40 38-40 36 6Q27 0 18 6 9 0 0 6-9 0-18 6-27 0-36 6z" ${STROKE}/><path d="M-22-12Q-14-26 0-28" ${LINE(3.5)}/>`;
+const BANANA = `<path d="M-33-32-37-44" ${LINE(7)}/>
+  <path d="M-38-32Q-48 8-16 30 14 48 44 26 46 22 42 21 16 30-4 16-28-2-28-32z" ${STROKE}/><path d="M-32-12Q-26 14 0 26" ${LINE(3)}/>`;
+const BALL = `<g transform="rotate(-20)"><circle r="37" ${STROKE}/><path d="M-37-6Q0 8 37-6M-36 8Q0 22 36 8" ${LINE(3.5)}/></g>
+  <path d="M-18-20Q-8-28 4-27" ${LINE(3.5)}/>`;
+const HAT = `<ellipse cy="14" rx="48" ry="13" ${STROKE}/><path d="M-26 12C-28-36 28-36 26 12Q0 20-26 12z" ${STROKE}/>
+  <path d="M-27 2Q0 10 27 2" stroke="${INK}" stroke-width="7" fill="none"/>`;
+const BALLOON = `<path d="M0 24Q-8 34 2 42T0 50" ${LINE(3)}/><path d="M-5 25H5L0 17z" ${STROKE}/><ellipse cy="-14" rx="28" ry="33" ${STROKE}/>
+  <path d="M-16-30Q-14-38-6-40" ${LINE(3.5)}/>`;
+const CLOUD = `<path d="${cloud(0, 2, 40, 24, 11, 0.62, 10)}" ${STROKE}/>`;
+const PEAR = `<path d="M0-30C-12-30-12-12-18 0-34 16-30 46 0 46 30 46 34 16 18 0 12-12 12-30 0-30z" ${STROKE}/>
+  <path d="M0-30Q2-40 6-46" ${LINE(5)}/><path d="M5-38Q16-50 28-42Q16-32 5-38z" ${STROKE}/>`;
+const LIFEBUOY = `<circle r="45" ${STROKE}/><circle r="22" ${STROKE}/>
+  <path d="${[45, 135, 225, 315].map((a) => `M${polar(22, a - 16).join(' ')}L${polar(45, a - 10).join(' ')}M${polar(22, a + 16).join(' ')}L${polar(45, a + 10).join(' ')}`).join('')}" ${LINE(4)}/>`;
+const BOW = mirror(`<path d="M-6 6-20 42-11 38-4 47z" ${STROKE}/>`) + mirror(`<path d="M-8 0C-24-30-48-26-46 0-48 26-24 30-8 0z" ${STROKE}/>`)
+  + `<ellipse rx="11" ry="13" ${STROKE}/>`;
+const DRUM = `<path d="M-6-20 22-48M6-20-22-48" ${LINE(5)}/>${DOT(22, -48, 5.5)}${DOT(-22, -48, 5.5)}
+  <path d="M-40-8V30Q0 44 40 30V-8z" ${STROKE}/><ellipse cy="-8" rx="40" ry="12" ${STROKE}/>
+  <path d="M-36 4-24 33-12 6 0 37 12 6 24 33 36 4" ${LINE(3.5)}/>`;
+const LEMON = `<path d="M-46 4Q-40-2-34-4C-24-34 24-34 34-4Q40-2 46 4 40 10 34 12C24 42-24 42-34 12Q-40 10-46 4z" ${STROKE}/>
+  <path d="M-14-20Q-6-26 4-26" ${LINE(3.5)}/>`;
+
 // the kinds of picture in each scene theme. A picture's number in the answer link is its theme's index × 10 + its
-// index here, so only ever add themes and pictures to the end
+// index here, so only ever add themes and pictures to the end (themes 0–6; 70 and up are the tricky ones)
 const THEMES = [
   { name: 'Garden', pics: [FLOWER, BEE, BUTTERFLY, LADYBIRD, SNAIL, MUSHROOM] },
   { name: 'Sea', pics: [FISH, SHELL, STARFISH, CRAB, OCTOPUS, TURTLE] },
@@ -324,8 +374,20 @@ const THEMES = [
   { name: 'Farm', pics: [PIG, CHICK, SHEEP, CARROT, TRACTOR, APPLE] },
   { name: 'Sweets', pics: [LOLLIPOP, SWEET, CUPCAKE, ICECREAM, DONUT, CAKE] },
 ];
-const LOOKALIKE = [[20, 12]];   // pictures that never share a scene in "A mix" (star and starfish)
-const picOf = (id) => THEMES[Math.floor(id / 10)]?.pics[id % 10];
+// pictures that are only ever tricky ones, numbered from 70 in the answer link (only ever add to the end)
+const EXTRAS = [SUN, FLY, DRAGONFLY, SPIDER, SLUG, UMBRELLA, LEAF, JELLYFISH, BANANA, BALL, HAT, BALLOON, CLOUD, PEAR, LIFEBUOY, BOW, DRUM, LEMON];
+const EXTRA_BASE = 70;
+// kind → the lookalikes that can trick a child counting it (another kind's picture works too, when it isn't a kind in
+// that scene): flower → sun, bee → fly, snail → slug, starfish → star, rocket → carrot, sheep → cloud…
+const TRICKS = {
+  0: [70], 1: [71], 2: [72], 3: [73, 15], 4: [74], 5: [75, 42],
+  10: [76], 12: [20], 13: [73], 14: [77], 15: [3],
+  20: [12], 21: [78], 22: [33], 23: [79], 24: [80], 25: [81],
+  31: [87], 32: [82], 33: [22], 35: [83],
+  40: [81, 0], 41: [85], 42: [5], 43: [33], 44: [84], 45: [86],
+};
+const NEVER_TOGETHER = [[20, 12]];   // kinds that never share a scene in "A mix" (star and starfish)
+const picOf = (id) => (id >= EXTRA_BASE ? EXTRAS[id - EXTRA_BASE] : THEMES[Math.floor(id / 10)]?.pics[id % 10]);
 const pic = (inner, x, y, s, a = 0) => `<g transform="translate(${f(x)} ${f(y)})${a ? ` rotate(${f(a)})` : ''} scale(${f(s / 100)})">${inner}</g>`;
 
 // k different pictures from a theme, or with "A mix" one from each of k different themes
@@ -333,8 +395,26 @@ function pickPics(k, theme) {
   if (theme !== 'mix') return shuffle(range(THEMES[+theme].pics.length)).slice(0, k).map((i) => +theme * 10 + i);
   for (;;) {
     const ids = shuffle(range(THEMES.length)).slice(0, k).map((t) => t * 10 + rint(0, THEMES[t].pics.length - 1));
-    if (!LOOKALIKE.some((pair) => pair.every((id) => ids.includes(id)))) return ids;
+    if (!NEVER_TOGETHER.some((pair) => pair.every((id) => ids.includes(id)))) return ids;
   }
+}
+// the lookalikes that can go with these kinds (none of them a kind itself), in a random order
+const trickCandidates = (ids) => shuffle([...new Set(ids.flatMap((id) => TRICKS[id] || []))].filter((id) => !ids.includes(id)));
+// pictures for a scene: with tricky ones on, try for kinds that have enough lookalikes between them
+function pickScenePics(k, theme, tricky) {
+  const want = TRICKY[tricky][0];
+  let ids;
+  for (let t = 0; t < 40; t++) if (trickCandidates(ids = pickPics(k, theme)).length >= want) break;
+  return ids;
+}
+// the tricky ones for a scene: a few different lookalikes, each 2 to a few times
+const pickDecoys = (ids, tricky) => trickCandidates(ids).slice(0, TRICKY[tricky][0]).map((pic) => ({ pic, n: rint(TRICKY_MIN, TRICKY[tricky][1]) }));
+// new pictures for the tricky ones after the kinds' pictures changed; any that no longer have a lookalike are dropped
+// (always the last ones, so the other pictures keep their numbers)
+function redoDecoys(p) {
+  const k = p.kinds.length, cands = trickCandidates(p.kinds.map((kd) => kd.pic));
+  p.objs = p.objs.filter((o) => o.k < k + cands.length);
+  p.decoys = p.decoys.slice(0, cands.length).map((d, i) => ({ ...d, pic: cands[i] }));
 }
 
 /* ======== scene: counts and scatter ======== */
@@ -343,7 +423,7 @@ function makeCounts(k, upTo) {
   const lo = Math.min(Math.max(1, Math.ceil(upTo * COUNT_LOW)), upTo - k + 1);
   return shuffle(range(upTo - lo + 1).map((i) => lo + i)).slice(0, k);
 }
-const mostPictures = (k, upTo) => sum(range(k).map((i) => upTo - i));
+const mostPictures = (k, upTo, tricky = 0) => sum(range(k).map((i) => upTo - i)) + TRICKY[tricky][0] * TRICKY[tricky][1];
 
 // Every picture sits on a 100 × 100 grid inside the frame (so the answer link can say where with 2 digits each way)
 // with a turn from 0 to 9 (-TURN…+TURN degrees). Its size wobble comes from those same digits, so the link needn't
@@ -418,13 +498,14 @@ function answerLayout(W, k, by, upTo) {
 }
 
 /* ======== answer link and QR code ======== */
-// #186214112010 3 0408 1110 2205 ... : scene width and height (mm), picture size (tenths of a mm), answer style
-// (0 write, 1 dots), up to, kinds, then each kind's picture and count, then every picture as x, y and turn
-// (2 + 2 + 1 digits), kind by kind. All digits, so they go into the QR code in its numeric mode, which packs them
+// #186214112010 3 0408 1110 2205 1 7103 ... : scene width and height (mm), picture size (tenths of a mm), answer style
+// (0 write, 1 dots), up to, kinds, then each kind's picture and count, then how many kinds of tricky one and each
+// one's picture and count, then every picture as x, y and turn (2 + 2 + 1 digits), kind by kind, tricky ones last. All digits, so they go into the QR code in its numeric mode, which packs them
 // tightly enough for a phone camera to read even a crowded scene.
 function answerDigits(p) {
   return pad(p.W, 3) + pad(p.H, 3) + pad(Math.round(p.size * 10), 3) + (p.by === 'dots' ? 1 : 0) + pad(p.upTo, 2) + p.kinds.length
-    + p.kinds.map((kd) => pad(kd.pic, 2) + pad(kd.n, 2)).join('') + p.objs.map((o) => pad(o.gx, 2) + pad(o.gy, 2) + o.r).join('');
+    + p.kinds.map((kd) => pad(kd.pic, 2) + pad(kd.n, 2)).join('')
+    + p.decoys.length + p.decoys.map((d) => pad(d.pic, 2) + pad(d.n, 2)).join('') + p.objs.map((o) => pad(o.gx, 2) + pad(o.gy, 2) + o.r).join('');
 }
 const answerBase = () => (location.hostname.endsWith('github.io') ? location.origin + location.pathname : PUBLIC_URL);
 
@@ -437,9 +518,11 @@ function parseHash() {
   const W = take(3), H = take(3), size = take(3) / 10, by = take(1), upTo = take(2), k = take(1);
   if (W < 40 || W > 300 || H < 30 || H > 300 || size < 3 || size > 40 || by > 1 || !UP_TO.includes(upTo) || !KINDS.includes(k)) return null;
   const kinds = range(k).map(() => ({ pic: take(2), n: take(2) }));
-  if (kinds.some((kd) => !picOf(kd.pic) || kd.n < 1 || kd.n > upTo) || s.length !== i + 5 * sum(kinds.map((kd) => kd.n))) return null;
-  const objs = kinds.flatMap((kd, ki) => range(kd.n).map(() => ({ k: ki, gx: take(2), gy: take(2), r: take(1) })));
-  return { W, H, size, by: by ? 'dots' : 'write', upTo, kinds, objs, Q: 0 };
+  const dk = take(1), decoys = dk > 2 ? [] : range(dk).map(() => ({ pic: take(2), n: take(2) })), all = [...kinds, ...decoys];
+  if (dk > 2 || kinds.some((kd) => kd.n > upTo) || all.some((kd) => !picOf(kd.pic) || kd.n < 1)
+    || s.length !== i + 5 * sum(all.map((kd) => kd.n))) return null;
+  const objs = all.flatMap((kd, ki) => range(kd.n).map(() => ({ k: ki, gx: take(2), gy: take(2), r: take(1) })));
+  return { W, H, size, by: by ? 'dots' : 'write', upTo, kinds, decoys, objs, Q: 0 };
 }
 
 // the QR code for an answer link: the address as text, the scene as numbers
@@ -498,22 +581,27 @@ function sceneSvg(p, opts) {
   s += `<path class="frame" stroke-width="0.9" d="${framePath(W, H, Q)}"/>`;
   if (Q) s += qrSvg(answerDigits(p), W - Q, 0, Q);
 
-  // the answer: number each kind in turn, in counting order
-  const done = [];
+  // the answer: the tricky ones fade and get a cross first, then number each kind in turn, in counting order
+  const done = [], picFor = (o) => picOf(o.k < k ? p.kinds[o.k].pic : p.decoys[o.k - k].pic), counted = objs.filter((o) => o.k < k);
   if (opts.answer) {
-    const step = Math.min(STEP_MAX, Math.max(STEP_MIN, COUNT_TIME / objs.length));
+    const step = Math.min(STEP_MAX, Math.max(STEP_MIN, COUNT_TIME / counted.length));
     let t = 0.6;
     for (let ki = 0; ki < k; ki++) {
-      countOrder(objs.filter((o) => o.k === ki)).forEach((o, j) => { o.d = t; o.no = j + 1; t += step; });
+      countOrder(counted.filter((o) => o.k === ki)).forEach((o, j) => { o.d = t; o.no = j + 1; t += step; });
       done[ki] = t;
       t += KIND_PAUSE;
     }
   }
   for (const o of objs) {
-    const style = opts.answer ? ` style="--d:${f(o.d)}s;--c:${TINTS[o.k]}"` : '';
-    s += `<g class="obj"${style}>${pic(picOf(p.kinds[o.k].pic), o.x, o.y, o.s, o.a)}</g>`;
+    const style = !opts.answer ? '' : o.k < k ? ` style="--d:${f(o.d)}s;--c:${TINTS[o.k]}"` : ' style="--d:0.3s"';
+    s += `<g class="obj${o.k < k ? '' : ' decoy'}"${style}>${pic(picFor(o), o.x, o.y, o.s, o.a)}</g>`;
   }
-  if (opts.answer) for (const o of objs) {
+  if (opts.answer) for (const o of objs.filter((q) => q.k >= k)) {
+    const r = Math.max(2.4, p.size * 0.26), bx = o.x + p.size * 0.32, by = o.y - p.size * 0.32, c = r * 0.42;
+    s += `<g class="pop" style="--d:0.3s"><circle cx="${f(bx)}" cy="${f(by)}" r="${f(r)}" fill="var(--faint)" stroke="#fff" stroke-width="${f(r * 0.18)}"/>
+      <path d="M${f(bx - c)} ${f(by - c)}l${f(2 * c)} ${f(2 * c)}m0 ${f(-2 * c)}l${f(-2 * c)} ${f(2 * c)}" stroke="#fff" stroke-width="${f(r * 0.32)}" stroke-linecap="round"/></g>`;
+  }
+  if (opts.answer) for (const o of counted) {
     const r = Math.max(2.4, p.size * 0.3), fs = r * (o.no > 9 ? 1.05 : 1.3), bx = o.x + p.size * 0.32, by = o.y - p.size * 0.32;
     s += `<g class="pop" style="--d:${f(o.d)}s"><circle cx="${f(bx)}" cy="${f(by)}" r="${f(r)}" fill="${COLOURS[o.k]}" stroke="#fff" stroke-width="${f(r * 0.18)}"/>
       <text x="${f(bx)}" y="${f(by + fs * 0.05)}" font-size="${f(fs)}" fill="#fff">${o.no}</text></g>`;
@@ -546,9 +634,9 @@ const SHEET_W = 186, SHEET_H = 272.5, GAP_PAGE = 8;   // mm inside the page marg
 
 // the scene size, QR size and picture size for some settings (n: the most pictures a scene can have)
 function layout(st = settings) {
-  const k = st.kinds, slotH = (SHEET_H - (st.perPage - 1) * GAP_PAGE) / st.perPage, n = mostPictures(k, st.upTo);
+  const k = st.kinds, slotH = (SHEET_H - (st.perPage - 1) * GAP_PAGE) / st.perPage, n = mostPictures(k, st.upTo, st.tricky);
   const ans = answerLayout(SHEET_W, k, st.answerBy, st.upTo), W = SHEET_W, H = Math.floor(slotH - ans.h - ANS_GAP);
-  const Q = Math.max(QR_SIZE[st.perPage], qrNeed(13 + 4 * k + 5 * n));
+  const Q = Math.max(QR_SIZE[st.perPage], qrNeed(14 + 4 * k + 4 * TRICKY[st.tricky][0] + 5 * n));
   return { W, H, Q, smallest: picSize(W, H, Q, n) };
 }
 const perPageFits = (pp) => pp === 1 || layout({ ...settings, perPage: pp }).smallest >= PIC_MIN;
@@ -556,15 +644,15 @@ const perPageFits = (pp) => pp === 1 || layout({ ...settings, perPage: pp }).sma
 function makeScene(pics) {
   const { W, H, Q } = layout(), k = settings.kinds;
   for (;;) {
-    const counts = makeCounts(k, settings.upTo);
-    let size = Math.round(picSize(W, H, Q, sum(counts)) * 10) / 10;
+    const counts = makeCounts(k, settings.upTo), decoys = pickDecoys(pics, settings.tricky), all = [...counts, ...decoys.map((d) => d.n)];
+    let size = Math.round(picSize(W, H, Q, sum(all)) * 10) / 10;
     for (let tries = 0; tries < 8; tries++, size = Math.round(size * 9.4) / 10) {
-      const objs = scatter(W, H, Q, size, counts);
-      if (objs) return { W, H, Q, size, by: settings.answerBy, upTo: settings.upTo, kinds: counts.map((n, i) => ({ pic: pics[i], n })), objs };
+      const objs = scatter(W, H, Q, size, all);
+      if (objs) return { W, H, Q, size, by: settings.answerBy, upTo: settings.upTo, kinds: counts.map((n, i) => ({ pic: pics[i], n })), decoys, objs };
     }
   }
 }
-const makePage = () => range(settings.perPage).map(() => makeScene(pickPics(settings.kinds, settings.theme)));
+const makePage = () => range(settings.perPage).map(() => makeScene(pickScenePics(settings.kinds, settings.theme, settings.tricky)));
 
 function sheetHtml(scenes) {
   const slots = scenes.map((p) => `<div class="slot">${sceneSvg(p, { qr: true })}</div>`).join('');
@@ -592,6 +680,7 @@ function readControls() {
     upTo: UP_TO.includes(+$('upTo').value) ? +$('upTo').value : DEFAULTS.upTo,
     answerBy: $('answerBy').value === 'dots' ? 'dots' : 'write',
     theme: theme === 'mix' || THEMES[+theme] ? theme : DEFAULTS.theme,
+    tricky: +$('tricky').value in TRICKY ? +$('tricky').value : DEFAULTS.tricky,
     perPage: +$('perPage').value === 2 ? 2 : 1,
     sheets: clamp($('sheets').value, 1, SHEETS_MAX, DEFAULTS.sheets),
   };
@@ -604,12 +693,13 @@ function writeControls() {
   if (settings.answerBy !== 'dots') settings.answerBy = 'write';
   if (settings.theme !== 'mix' && !THEMES[+settings.theme]) settings.theme = DEFAULTS.theme;
   settings.theme = String(settings.theme);
+  if (!(settings.tricky in TRICKY)) settings.tricky = DEFAULTS.tricky;
   if (settings.perPage !== 2) settings.perPage = 1;
   const two = perPageFits(2);
   $('perPage').options[1].disabled = !two;
   if (!two) settings.perPage = 1;
   settings.sheets = clamp(settings.sheets, 1, SHEETS_MAX, DEFAULTS.sheets);
-  for (const k of ['kinds', 'upTo', 'answerBy', 'theme', 'perPage', 'sheets']) $(k).value = settings[k];
+  for (const k of ['kinds', 'upTo', 'answerBy', 'theme', 'tricky', 'perPage', 'sheets']) $(k).value = settings[k];
   $('sheets').min = 1; $('sheets').max = SHEETS_MAX;
 }
 
@@ -620,10 +710,13 @@ function startMaker() {
   $('upTo').innerHTML = UP_TO.map((n) => `<option value="${n}">${n} each</option>`).join('');
   $('theme').innerHTML = THEMES.map((t, i) => `<option value="${i}">${t.name}</option>`).join('') + '<option value="mix">A mix</option>';
   writeControls();
-  for (const k of ['kinds', 'upTo', 'answerBy', 'perPage']) $(k).addEventListener('change', () => { readControls(); newAll(); });
+  for (const k of ['kinds', 'upTo', 'answerBy', 'tricky', 'perPage']) $(k).addEventListener('change', () => { readControls(); newAll(); });
   $('theme').addEventListener('change', () => {   // same scenes, new pictures
     readControls();
-    for (const p of pages.flat()) pickPics(p.kinds.length, settings.theme).forEach((id, i) => { p.kinds[i].pic = id; });
+    for (const p of pages.flat()) {
+      pickScenePics(p.kinds.length, settings.theme, settings.tricky).forEach((id, i) => { p.kinds[i].pic = id; });
+      redoDecoys(p);
+    }
     renderPages();
   });
   $('sheets').addEventListener('change', () => {   // keep the pages already made, add or drop at the end
